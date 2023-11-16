@@ -80,7 +80,7 @@ In addition, draw a bounding box around each vehicle as well.
 ## Virtual Environment
 ```
 python3 -m venv 431_project_venv
-source 431_project_venv/Source/activate
+source 431_project_venv/Scripts/activate
 pip install open3d
 ```
 
