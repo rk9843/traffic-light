@@ -67,16 +67,70 @@ def ClusterLidar(file, median_cloud,last_cloud):
     if len(last_cloud.points)>0:
         points = remove_matching_points(points,np.asarray(last_cloud.points))
     print(len(points))
+    point_cloud = o3d.geometry.PointCloud()
+    point_cloud.points = o3d.utility.Vector3dVector(points)
     clusters = np.array(0)
     if(len(points>0)):
-        clustering = DBSCAN(eps=.5, min_samples=20).fit(points)
-        cluster_labels = clustering.labels_
-        visualize_clusters(points, cluster_labels)
-        unique_labels = set(cluster_labels)
-        colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
+        #clustering = DBSCAN(eps=.5, min_samples=20).fit(points)
+        #cluster_labels = clustering.labels_
+        #visualize_clusters(points, cluster_labels)
+        #unique_labels = set(cluster_labels)
+        #colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
+        dbscan = DBSCAN(eps=.5, min_samples=10)  # Adjust parameters as needed
+        labels = dbscan.fit_predict(point_cloud.points)
 
-        for cluster, color in zip(unique_labels, colors):
-            clusters = points[cluster_labels == cluster]
+        # Get unique cluster labels
+        unique_labels = np.unique(labels)
+        num_clusters = len(unique_labels[unique_labels != -1])  # Exclude noise points (-1 label)
+        print(num_clusters)
+
+        if (num_clusters > 0):
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+
+            for cluster_label in range(num_clusters):
+                cluster_indices = np.where(labels == cluster_label)[0]
+                if len(cluster_indices) > 0:
+                    cluster_points = points[cluster_indices]
+
+                    min_xyz = np.min(cluster_points, axis=0)
+                    max_xyz = np.max(cluster_points, axis=0)
+
+                    edges = [
+                        [min_xyz[0], min_xyz[1], min_xyz[2]],
+                        [max_xyz[0], min_xyz[1], min_xyz[2]],
+                        [max_xyz[0], max_xyz[1], min_xyz[2]],
+                        [min_xyz[0], max_xyz[1], min_xyz[2]],
+                        [min_xyz[0], min_xyz[1], max_xyz[2]],
+                        [max_xyz[0], min_xyz[1], max_xyz[2]],
+                        [max_xyz[0], max_xyz[1], max_xyz[2]],
+                        [min_xyz[0], max_xyz[1], max_xyz[2]],
+                    ]
+                    edges = np.array(edges)
+
+                    ax.scatter(cluster_points[:, 0], cluster_points[:, 1], cluster_points[:, 2], marker='.',
+                               label=f'Cluster {cluster_label}')
+
+                    for i, j in zip([0, 1, 2, 3], [1, 2, 3, 0]):
+                        ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
+                                  color='r')
+
+                    for i, j in zip([4, 5, 6, 7], [5, 6, 7, 4]):
+                        ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
+                                  color='r')
+
+                    for i, j in zip([0, 4], [1, 5]):
+                        ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
+                                  color='r')
+
+                    for i, j in zip([2, 6], [3, 7]):
+                        ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
+                                  color='r')
+            ax.set_xlabel('X')
+            ax.set_ylabel('Y')
+            ax.set_zlabel('Z')
+            ax.legend()
+    plt.show()
     return clusters, pcd
 
 
@@ -97,7 +151,8 @@ def visualize_clusters(points, cluster_labels):
     for cluster, color in zip(unique_labels, colors):
         cluster_points = points[cluster_labels == cluster]
         ax.scatter(cluster_points[:, 0], cluster_points[:, 1], cluster_points[:, 2], c=[color], marker='o', s=20)
-    plt.show()
+        plt.show()
+
 def remove_matching_points(pointcloud, mediancloud):
     tolerance = 1e-3
     rounded_pc1 = np.around(pointcloud, decimals=int(-np.log10(tolerance)))
