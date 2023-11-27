@@ -5,7 +5,14 @@ from matplotlib import pyplot as plt
 from natsort import natsorted
 from sklearn.cluster import DBSCAN
 import natsort
-import ImageInfo.ImageInfo as im
+import ImageInfo as im
+
+
+class Vehicle:
+    def __init__(self, cluster, last_position):
+        self.cluster = cluster
+        self.last_position = last_position
+        self.velocity = np.zeros(3)
 
 
 def main(imgFiles, pointCloudFiles):
@@ -16,9 +23,11 @@ def main(imgFiles, pointCloudFiles):
     lastCloud = o3d.geometry.PointCloud()
     points = np.zeros((0, 3))
     lastCloud.points = o3d.utility.Vector3dVector(points)
+    vehicles = []
+
     for filename in files:
         print(pointCloudFiles + "\\" + filename)
-        lastCloud = createVehicleInfo((pointCloudFiles + "\\" + filename), imageInfo, median_cloud,lastCloud)
+        lastCloud, vehicles = createVehicleInfo((pointCloudFiles + "\\" + filename), imageInfo, median_cloud, lastCloud, vehicles)
 
 def findMedianCloud(files,pointCloudFiles):
     pointClouds = []
@@ -47,20 +56,49 @@ def findMedianCloud(files,pointCloudFiles):
     return median_cloud
 
 
+def createVehicleInfo(file, imageInfo, median_cloud, lastCloud, vehicles):
+    lastCloud, vehicles = FillVehics(
+        file, imageInfo, median_cloud, lastCloud, vehicles
+    )
+    return lastCloud, vehicles
 
-def FillVehics(img, imageInfo, median_cloud,lastCloud):
-    clusters,lastCloud = ClusterLidar(img,median_cloud,lastCloud)
-    return lastCloud
-    #for clusts in clusters:
-        # temp = im.ImageInfo(clusts, median_cloud)
-        # temp.SetPosition(clusts.)
-        #imageInfo.append(temp)
+
+def FillVehics(img, imageInfo, median_cloud, lastCloud, vehicles):
+    clusters, lastCloud = ClusterLidar(img, median_cloud, lastCloud, vehicles)
+    # print("clusters: {}".format(clusters))
+
+    updated_vehicles = []
+    for cluster in clusters:
+        closest_vehicle = findClosestVehicle(cluster, vehicles)
+        if closest_vehicle is not None:
+            velocity = cluster.mean(axis=0) - closest_vehicle.last_position
+            if 0.1 < velocity < 0.5:
+                closest_vehicle.velocity = velocity
+                updated_vehicles.append(closest_vehicle)
+        else:
+            new_vehicle = Vehicle(cluster, cluster.mean(axis=0))
+            updated_vehicles.append(new_vehicle)
+
+    return lastCloud, updated_vehicles
+
+
+def findClosestVehicle(cluster, vehicles):
+    min_distance = float("inf")
+    closest_vehicle = None
+
+    for vehicle in vehicles:
+        distance = np.linalg.norm(cluster.mean(axis=0) - vehicle.last_position)
+        if distance < min_distance:
+            min_distance = distance
+            closest_vehicle = vehicle
+
+    return closest_vehicle
 
 
 # create clusters to count and track the cars
 # measure velocity from the movement of one frame to the next
 # compare based on the closest cluster to the position of the cluster in the previous frame
-def ClusterLidar(file, median_cloud,last_cloud):
+def ClusterLidar(file, median_cloud, last_cloud, vehicles):
     pcd = o3d.io.read_point_cloud(file)
     point_cloud = np.asarray(pcd.points)
     points = remove_matching_points(point_cloud, median_cloud)
@@ -71,7 +109,7 @@ def ClusterLidar(file, median_cloud,last_cloud):
     if(len(points>0)):
         clustering = DBSCAN(eps=.5, min_samples=20).fit(points)
         cluster_labels = clustering.labels_
-        visualize_clusters(points, cluster_labels)
+        visualize_clusters(points, cluster_labels, vehicles)
         unique_labels = set(cluster_labels)
         colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
 
@@ -80,24 +118,6 @@ def ClusterLidar(file, median_cloud,last_cloud):
     return clusters, pcd
 
 
-def createVehicleInfo(file, imageInfo, median_cloud,lastCloud):
-    lastCloud = FillVehics(file, imageInfo, median_cloud,lastCloud)
-    return lastCloud
-
-    # call functions to set each element of the vehic class
-
-def visualize_clusters(points, cluster_labels):
-    # Visualize clusters
-    fig = plt.figure(figsize=(24, 24))
-    ax = fig.add_subplot(111, projection='3d')
-
-    unique_labels = set(cluster_labels)
-    colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
-
-    for cluster, color in zip(unique_labels, colors):
-        cluster_points = points[cluster_labels == cluster]
-        ax.scatter(cluster_points[:, 0], cluster_points[:, 1], cluster_points[:, 2], c=[color], marker='o', s=20)
-    plt.show()
 def remove_matching_points(pointcloud, mediancloud):
     tolerance = 1e-3
     rounded_pc1 = np.around(pointcloud, decimals=int(-np.log10(tolerance)))
@@ -117,12 +137,33 @@ def remove_matching_points(pointcloud, mediancloud):
     # Remove matching points from both point clouds
     filtered_pc1 = np.delete(pointcloud, indices_pc1, axis=0)
 
-
     return filtered_pc1
+
+
+def visualize_clusters(points, cluster_labels, vehicles):
+    # Visualize clusters
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111, projection='3d')
+
+    unique_labels = set(cluster_labels)
+    colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
+
+    for cluster, color in zip(unique_labels, colors):
+        cluster_points = points[cluster_labels == cluster]
+        ax.scatter(cluster_points[:, 0], cluster_points[:, 1], cluster_points[:, 2], c=[color], marker='o', s=20)
+
+
+    print("lenvehicles: {}".format(len(vehicles)))
+    if len(vehicles) < 30:
+        for vehicle in vehicles:
+            print("vehicles: {}".format(len(vehicles)))
+            cluster = vehicle.cluster
+            ax.scatter(cluster[0], cluster[1], cluster[2], c = ["black"], marker='x', s=20)
+
+    plt.show()
 
 if __name__ == "__main__":
     # LOAD Folders
-    imgFiles = "F:\\computer vision final project\\traffic-light\\dataset\\Images"
-    print(imgFiles)
-    pointCloudFiles = "F:\\computer vision final project\\traffic-light\\dataset\PointClouds"
+    imgFiles = "dataset\Images"
+    pointCloudFiles = "dataset\PointClouds"
     main(imgFiles, pointCloudFiles)
