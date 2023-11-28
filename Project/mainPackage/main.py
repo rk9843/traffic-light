@@ -64,9 +64,9 @@ def ClusterLidar(file, median_cloud,last_cloud):
     pcd = o3d.io.read_point_cloud(file)
     point_cloud = np.asarray(pcd.points)
     points = remove_matching_points(point_cloud, median_cloud)
-    if len(last_cloud.points)>0:
-        points = remove_matching_points(points,np.asarray(last_cloud.points))
-    print(len(points))
+    #if len(last_cloud.points)>0:
+    #    points = remove_matching_points(points,np.asarray(last_cloud.points))
+    #print(len(points))
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(points)
     clusters = np.array(0)
@@ -76,7 +76,7 @@ def ClusterLidar(file, median_cloud,last_cloud):
         #visualize_clusters(points, cluster_labels)
         #unique_labels = set(cluster_labels)
         #colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
-        dbscan = DBSCAN(eps=.5, min_samples=10)  # Adjust parameters as needed
+        dbscan = DBSCAN(eps=.8, min_samples=10)  # Adjust parameters as needed
         labels = dbscan.fit_predict(point_cloud.points)
 
         # Get unique cluster labels
@@ -140,21 +140,9 @@ def createVehicleInfo(file, imageInfo, median_cloud,lastCloud):
 
     # call functions to set each element of the vehic class
 
-def visualize_clusters(points, cluster_labels):
-    # Visualize clusters
-    fig = plt.figure(figsize=(24, 24))
-    ax = fig.add_subplot(111, projection='3d')
-
-    unique_labels = set(cluster_labels)
-    colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
-
-    for cluster, color in zip(unique_labels, colors):
-        cluster_points = points[cluster_labels == cluster]
-        ax.scatter(cluster_points[:, 0], cluster_points[:, 1], cluster_points[:, 2], c=[color], marker='o', s=20)
-        plt.show()
 
 def remove_matching_points(pointcloud, mediancloud):
-    tolerance = 1e-3
+    tolerance = 1e-4
     rounded_pc1 = np.around(pointcloud, decimals=int(-np.log10(tolerance)))
     rounded_pc2 = np.around(mediancloud, decimals=int(-np.log10(tolerance)))
 
