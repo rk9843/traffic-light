@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from natsort import natsorted
 from sklearn.cluster import DBSCAN
 import natsort
-import ImageInfo.ImageInfo as im
+import ImageInfo as im
 
 
 def main(imgFiles, pointCloudFiles):
@@ -18,7 +18,7 @@ def main(imgFiles, pointCloudFiles):
     lastCloud.points = o3d.utility.Vector3dVector(points)
     for filename in files:
         print(pointCloudFiles + "\\" + filename)
-        lastCloud = createVehicleInfo((pointCloudFiles + "\\" + filename), imageInfo, median_cloud,lastCloud)
+        lastCloud = createVehicleInfo((pointCloudFiles + "\\" + filename), imageInfo, median_cloud, lastCloud)
 
 def findMedianCloud(files,pointCloudFiles):
     pointClouds = []
@@ -56,13 +56,30 @@ def FillVehics(img, imageInfo, median_cloud,lastCloud):
         # temp.SetPosition(clusts.)
         #imageInfo.append(temp)
 
+def display_inlier_outlier(cloud, ind):
+    inlier_cloud = cloud.select_by_index(ind)
+    outlier_cloud = cloud.select_by_index(ind, invert=True)
+    # print("{} outliers. That is {}%".format(len(outlier_cloud.points), (len(outlier_cloud.points)/(len(outlier_cloud.points)+len(inlier_cloud.points)))))
+    
+    print("Showing outliers (red) and inliers (gray): ")
+    outlier_cloud.paint_uniform_color([1, 0, 0])
+    inlier_cloud.paint_uniform_color([0.8, 0.8, 0.8])
+    o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud])
+
+    return inlier_cloud
 
 # create clusters to count and track the cars
 # measure velocity from the movement of one frame to the next
 # compare based on the closest cluster to the position of the cluster in the previous frame
-def ClusterLidar(file, median_cloud,last_cloud):
+def ClusterLidar(file, median_cloud, last_cloud):
     pcd = o3d.io.read_point_cloud(file)
-    point_cloud = np.asarray(pcd.points)
+    voxel_down_pcd = pcd.voxel_down_sample(voxel_size = 0.04)
+
+    print("Statistical oulier removal")
+    cl, ind = voxel_down_pcd.remove_statistical_outlier(nb_neighbors = 25, std_ratio = 1)
+    inlier_cloud = display_inlier_outlier(voxel_down_pcd, ind)
+
+    point_cloud = np.asarray(inlier_cloud.points)
     points = remove_matching_points(point_cloud, median_cloud)
     #if len(last_cloud.points)>0:
     #   points = remove_matching_points(points,np.asarray(last_cloud.points))
@@ -76,7 +93,7 @@ def ClusterLidar(file, median_cloud,last_cloud):
         #visualize_clusters(points, cluster_labels)
         #unique_labels = set(cluster_labels)
         #colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
-        dbscan = DBSCAN(eps=.8, min_samples=10)  # Adjust parameters as needed
+        dbscan = DBSCAN(eps=0.8, min_samples=10)  # Adjust parameters as needed 1,30
         labels = dbscan.fit_predict(point_cloud.points)
 
         # Get unique cluster labels
@@ -96,36 +113,37 @@ def ClusterLidar(file, median_cloud,last_cloud):
                     min_xyz = np.min(cluster_points, axis=0)
                     max_xyz = np.max(cluster_points, axis=0)
 
-                    edges = [
-                        [min_xyz[0], min_xyz[1], min_xyz[2]],
-                        [max_xyz[0], min_xyz[1], min_xyz[2]],
-                        [max_xyz[0], max_xyz[1], min_xyz[2]],
-                        [min_xyz[0], max_xyz[1], min_xyz[2]],
-                        [min_xyz[0], min_xyz[1], max_xyz[2]],
-                        [max_xyz[0], min_xyz[1], max_xyz[2]],
-                        [max_xyz[0], max_xyz[1], max_xyz[2]],
-                        [min_xyz[0], max_xyz[1], max_xyz[2]],
-                    ]
-                    edges = np.array(edges)
+                    if max_xyz[2] <= 15:  # Set this to 5 to remove traffic light noise
+                        edges = [
+                            [min_xyz[0], min_xyz[1], min_xyz[2]],
+                            [max_xyz[0], min_xyz[1], min_xyz[2]],
+                            [max_xyz[0], max_xyz[1], min_xyz[2]],
+                            [min_xyz[0], max_xyz[1], min_xyz[2]],
+                            [min_xyz[0], min_xyz[1], max_xyz[2]],
+                            [max_xyz[0], min_xyz[1], max_xyz[2]],
+                            [max_xyz[0], max_xyz[1], max_xyz[2]],
+                            [min_xyz[0], max_xyz[1], max_xyz[2]],
+                        ]
+                        edges = np.array(edges)
 
-                    ax.scatter(cluster_points[:, 0], cluster_points[:, 1], cluster_points[:, 2], marker='.',
-                               label=f'Cluster {cluster_label}')
+                        ax.scatter(cluster_points[:, 0], cluster_points[:, 1], cluster_points[:, 2], marker='.',
+                                label=f'Cluster {cluster_label}')
 
-                    for i, j in zip([0, 1, 2, 3], [1, 2, 3, 0]):
-                        ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
-s                                  color='r')
+                        for i, j in zip([0, 1, 2, 3], [1, 2, 3, 0]):
+                            ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
+                                    color='r')
 
-                    for i, j in zip([4, 5, 6, 7], [5, 6, 7, 4]):
-                        ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
-                                  color='r')
+                        for i, j in zip([4, 5, 6, 7], [5, 6, 7, 4]):
+                            ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
+                                    color='r')
 
-                    for i, j in zip([0, 4], [1, 5]):
-                        ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
-                                  color='r')
+                        for i, j in zip([0, 4], [1, 5]):
+                            ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
+                                    color='r')
 
-                    for i, j in zip([2, 6], [3, 7]):
-                        ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
-                                  color='r')
+                        for i, j in zip([2, 6], [3, 7]):
+                            ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
+                                    color='r')
             ax.set_xlabel('X')
             ax.set_ylabel('Y')
             ax.set_zlabel('Z')
@@ -142,7 +160,7 @@ def createVehicleInfo(file, imageInfo, median_cloud,lastCloud):
 
 
 def remove_matching_points(pointcloud, mediancloud):
-    tolerance = 1e-7
+    tolerance = 1e-6
     rounded_pc1 = np.around(pointcloud, decimals=int(-np.log10(tolerance)))
     rounded_pc2 = np.around(mediancloud, decimals=int(-np.log10(tolerance)))
 
@@ -165,7 +183,7 @@ def remove_matching_points(pointcloud, mediancloud):
 
 if __name__ == "__main__":
     # LOAD Folders
-    imgFiles = "F:\\computer vision final project\\traffic-light\\dataset\\Images"
+    imgFiles = "dataset\\Images"
     print(imgFiles)
-    pointCloudFiles = "F:\\computer vision final project\\traffic-light\\dataset\PointClouds"
+    pointCloudFiles = "dataset\PointClouds"
     main(imgFiles, pointCloudFiles)
