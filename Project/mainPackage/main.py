@@ -65,7 +65,7 @@ def ClusterLidar(file, median_cloud,last_cloud):
     point_cloud = np.asarray(pcd.points)
     points = remove_matching_points(point_cloud, median_cloud)
     #if len(last_cloud.points)>0:
-    #    points = remove_matching_points(points,np.asarray(last_cloud.points))
+    #   points = remove_matching_points(points,np.asarray(last_cloud.points))
     #print(len(points))
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(points)
@@ -113,7 +113,7 @@ def ClusterLidar(file, median_cloud,last_cloud):
 
                     for i, j in zip([0, 1, 2, 3], [1, 2, 3, 0]):
                         ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
-                                  color='r')
+s                                  color='r')
 
                     for i, j in zip([4, 5, 6, 7], [5, 6, 7, 4]):
                         ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
@@ -142,7 +142,7 @@ def createVehicleInfo(file, imageInfo, median_cloud,lastCloud):
 
 
 def remove_matching_points(pointcloud, mediancloud):
-    tolerance = 1e-4
+    tolerance = 1e-7
     rounded_pc1 = np.around(pointcloud, decimals=int(-np.log10(tolerance)))
     rounded_pc2 = np.around(mediancloud, decimals=int(-np.log10(tolerance)))
 
