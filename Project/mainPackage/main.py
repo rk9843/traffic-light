@@ -18,7 +18,7 @@ def main(imgFiles, pointCloudFiles):
     lastCloud.points = o3d.utility.Vector3dVector(points)
     for filename in files:
         print(pointCloudFiles + "\\" + filename)
-        lastCloud = createVehicleInfo((pointCloudFiles + "\\" + filename), imageInfo, median_cloud, lastCloud)
+        lastCloud = createVehicleInfo((pointCloudFiles + "\\" + filename), imageInfo, median_cloud,lastCloud)
 
 def findMedianCloud(files,pointCloudFiles):
     pointClouds = []
@@ -40,7 +40,7 @@ def findMedianCloud(files,pointCloudFiles):
         median_cloud[i] = median_point
 
     median_cloud = median_cloud[~np.all(median_cloud == 0, axis=1)]
-    fig = plt.figure(figsize=(24, 24))
+    fig = plt.figure(figsize=(24, 24))  
     ax = fig.add_subplot(111, projection='3d')
     ax.scatter(median_cloud[:,0], median_cloud[:,1], median_cloud[:,2], marker='o', s=20)
     plt.show()
@@ -51,17 +51,14 @@ def findMedianCloud(files,pointCloudFiles):
 def FillVehics(img, imageInfo, median_cloud,lastCloud):
     clusters,lastCloud = ClusterLidar(img,median_cloud,lastCloud)
     return lastCloud
-    #for clusts in clusters:
-        # temp = im.ImageInfo(clusts, median_cloud)
-        # temp.SetPosition(clusts.)
-        #imageInfo.append(temp)
+
 
 def display_inlier_outlier(cloud, ind):
     inlier_cloud = cloud.select_by_index(ind)
     outlier_cloud = cloud.select_by_index(ind, invert=True)
     # print("{} outliers. That is {}%".format(len(outlier_cloud.points), (len(outlier_cloud.points)/(len(outlier_cloud.points)+len(inlier_cloud.points)))))
     
-    print("Showing outliers (red) and inliers (gray): ")
+    print("Showing outliers (red) and inlddddiers (gray): ")
     outlier_cloud.paint_uniform_color([1, 0, 0])
     inlier_cloud.paint_uniform_color([0.8, 0.8, 0.8])
     o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud])
@@ -178,12 +175,34 @@ def remove_matching_points(pointcloud, mediancloud):
     # Remove matching points from both point clouds
     filtered_pc1 = np.delete(pointcloud, indices_pc1, axis=0)
 
-
     return filtered_pc1
+
+
+def visualize_clusters(points, cluster_labels, vehicles):
+    # Visualize clusters
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111, projection='3d')
+
+    unique_labels = set(cluster_labels)
+    colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
+
+    for cluster, color in zip(unique_labels, colors):
+        cluster_points = points[cluster_labels == cluster]
+        ax.scatter(cluster_points[:, 0], cluster_points[:, 1], cluster_points[:, 2], c=[color], marker='o', s=20)
+
+
+    print("lenvehicles: {}".format(len(vehicles)))
+    if len(vehicles) < 30:
+        for vehicle in vehicles:
+            print("vehicles: {}".format(len(vehicles)))
+            cluster = vehicle.cluster
+            ax.scatter(cluster[0], cluster[1], cluster[2], c = ["black"], marker='x', s=20)
+
+    plt.show()
 
 if __name__ == "__main__":
     # LOAD Folders
-    imgFiles = "dataset\\Images"
+    imgFiles = "dataset\Images"
     print(imgFiles)
     pointCloudFiles = "dataset\PointClouds"
     main(imgFiles, pointCloudFiles)
