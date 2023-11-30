@@ -8,6 +8,9 @@ import natsort
 import ImageInfo as im
 
 
+# { (x, y, z) : velocity }
+cars = {}
+
 def main(imgFiles, pointCloudFiles):
     imageInfo = []
     files = os.listdir(pointCloudFiles)
@@ -19,6 +22,7 @@ def main(imgFiles, pointCloudFiles):
     for filename in files:
         print(pointCloudFiles + "\\" + filename)
         lastCloud = createVehicleInfo((pointCloudFiles + "\\" + filename), imageInfo, median_cloud,lastCloud)
+        print(cars)
 
 def findMedianCloud(files,pointCloudFiles):
     pointClouds = []
@@ -58,10 +62,10 @@ def display_inlier_outlier(cloud, ind):
     outlier_cloud = cloud.select_by_index(ind, invert=True)
     # print("{} outliers. That is {}%".format(len(outlier_cloud.points), (len(outlier_cloud.points)/(len(outlier_cloud.points)+len(inlier_cloud.points)))))
     
-    print("Showing outliers (red) and inlddddiers (gray): ")
-    outlier_cloud.paint_uniform_color([1, 0, 0])
-    inlier_cloud.paint_uniform_color([0.8, 0.8, 0.8])
-    o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud])
+    # print("Showing outliers (red) and inlddddiers (gray): ")
+    # outlier_cloud.paint_uniform_color([1, 0, 0])
+    # inlier_cloud.paint_uniform_color([0.8, 0.8, 0.8])
+    # o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud])
 
     return inlier_cloud
 
@@ -110,7 +114,7 @@ def ClusterLidar(file, median_cloud, last_cloud):
                     min_xyz = np.min(cluster_points, axis=0)
                     max_xyz = np.max(cluster_points, axis=0)
 
-                    if max_xyz[2] <= 15:  # Set this to 5 to remove traffic light noise
+                    if max_xyz[0] - min_xyz[0] <= 4 and max_xyz[1] - min_xyz[1] <= 4 and max_xyz[2] <= 5:  # Set this to 5 to remove traffic light noise
                         edges = [
                             [min_xyz[0], min_xyz[1], min_xyz[2]],
                             [max_xyz[0], min_xyz[1], min_xyz[2]],
@@ -125,6 +129,31 @@ def ClusterLidar(file, median_cloud, last_cloud):
 
                         ax.scatter(cluster_points[:, 0], cluster_points[:, 1], cluster_points[:, 2], marker='.',
                                 label=f'Cluster {cluster_label}')
+                        # print(f"CAR {cluster_label}: Center:({(max_xyz[0] - min_xyz[0]):.8f}, {(max_xyz[1] - min_xyz[1]):.8f}, {(max_xyz[2] - min_xyz[2]):.8f})")
+
+                        new_car_center = (max_xyz[0] - min_xyz[0], max_xyz[1] - min_xyz[1], max_xyz[2] - min_xyz[2])
+                        if cars:
+                            similarity_threshold = 0.0001  ## Change this threshold accordingly
+
+                            for car_id, car_info in cars.items():
+                                existing_center = car_info['center']
+
+                                if (
+                                    abs(existing_center[0] - new_car_center[0]) < similarity_threshold
+                                    or abs(existing_center[1] - new_car_center[1]) < similarity_threshold
+                                    or abs(existing_center[2] - new_car_center[2]) < similarity_threshold
+                                ):
+                                    velocity = ((existing_center[0] - new_car_center[0])**2 +
+                                                (existing_center[1] - new_car_center[1])**2 +
+                                                (existing_center[2] - new_car_center[2])**2) ** 0.5
+                                    cars[car_id]['velocity'] = round(velocity, 8)
+                                    cars[car_id]['center'] = tuple(round(coord, 8) for coord in new_car_center)
+                                    break
+                            else:
+                                car_id = len(cars) + 1
+                                cars[car_id] = {'center': tuple(round(coord, 8) for coord in new_car_center), 'velocity': 0.0}
+                        else:
+                            cars[1] = {'center': tuple(round(coord, 8) for coord in new_car_center), 'velocity': 0.0}
 
                         for i, j in zip([0, 1, 2, 3], [1, 2, 3, 0]):
                             ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
