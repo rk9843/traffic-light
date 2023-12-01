@@ -90,15 +90,7 @@ def ClusterLidar(file, median_cloud):
         # Get unique cluster labels
         unique_labels = np.unique(labels)
         num_clusters = len(unique_labels[unique_labels != -1])  # Exclude noise points (-1 label)
-
-
-        # Retrieve cluster positions (centroids)
         cluster_positions = []
-        for label in unique_labels:
-            cluster_points = np.asarray(point_cloud.points)[labels==label]
-            centroid = np.mean(cluster_points, axis=0)
-            cluster_positions.append(centroid)
-        print(cluster_positions)
         if (num_clusters > 0):
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
@@ -107,7 +99,8 @@ def ClusterLidar(file, median_cloud):
                 cluster_indices = np.where(labels == cluster_label)[0]
                 if len(cluster_indices) > 0:
                     cluster_points = points[cluster_indices]
-
+                    centroid = np.mean(cluster_points, axis=0)
+                    cluster_positions.append(centroid)
                     min_xyz = np.min(cluster_points, axis=0)
                     max_xyz = np.max(cluster_points, axis=0)
 
@@ -128,7 +121,7 @@ def ClusterLidar(file, median_cloud):
                                 label=f'Cluster {cluster_label}')
                         # print(f"CAR {cluster_label}: Center:({(max_xyz[0] - min_xyz[0]):.8f}, {(max_xyz[1] - min_xyz[1]):.8f}, {(max_xyz[2] - min_xyz[2]):.8f})")
 
-                        new_car_center = (max_xyz[0] - min_xyz[0], max_xyz[1] - min_xyz[1], max_xyz[2] - min_xyz[2])
+                        new_car_center = centroid
                         if cars:
                             similarity_threshold = 1e-2 ## Change this threshold accordingly
 
