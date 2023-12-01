@@ -74,7 +74,6 @@ def ClusterLidar(file, median_cloud):
     pcd = o3d.io.read_point_cloud(file)
     voxel_down_pcd = pcd.voxel_down_sample(voxel_size = 0.04)
 
-    print("Statistical oulier removal")
     cl, ind = voxel_down_pcd.remove_statistical_outlier(nb_neighbors = 25, std_ratio = 1)
     inlier_cloud = display_inlier_outlier(voxel_down_pcd, ind)
 
@@ -123,7 +122,7 @@ def ClusterLidar(file, median_cloud):
 
                         new_car_center = centroid
                         if cars:
-                            similarity_threshold = 1e-2 ## Change this threshold accordingly
+                            similarity_threshold = 1 ## Change this threshold accordingly
 
                             for car_id, car_info in cars.items():
                                 existing_center = car_info['center']
@@ -133,9 +132,9 @@ def ClusterLidar(file, median_cloud):
                                     and abs(existing_center[1] - new_car_center[1]) < similarity_threshold
                                     and abs(existing_center[2] - new_car_center[2]) < similarity_threshold
                                 ):
-                                    cars[car_id]['MvecX'] = round((existing_center[0] - new_car_center[0])/(1/30),8)
-                                    cars[car_id]['MvecY'] = round((existing_center[1] - new_car_center[1])/(1/30),8)
-                                    cars[car_id]['MvecZ'] = round((existing_center[2] - new_car_center[2])/(1/30),8)
+                                    cars[car_id]['MvecX'] = round((existing_center[0] - new_car_center[0])*30,8)
+                                    cars[car_id]['MvecY'] = round((existing_center[1] - new_car_center[1])*30,8)
+                                    cars[car_id]['MvecZ'] = round((existing_center[2] - new_car_center[2])*30,8)
                                     cars[car_id]['center'] = tuple(round(coord, 8) for coord in new_car_center)
                                     cars[car_id]['coord_min'] = min_xyz
                                     cars[car_id]['coord_max'] = max_xyz
@@ -229,6 +228,5 @@ def visualize_clusters(points, cluster_labels, vehicles):
 
 if __name__ == "__main__":
     # LOAD Folders
-    imgFiles = "F:\\Computer Vision\\traffic-light\\ryan\\dataset\\Images"
     pointCloudFiles = "F:\\Computer Vision\\traffic-light\\ryan\\dataset\\PointClouds"
     main(pointCloudFiles)
