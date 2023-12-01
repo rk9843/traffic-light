@@ -8,7 +8,6 @@ import natsort
 import ImageInfo as im
 
 
-# { (x, y, z) : velocity }
 cars = {}
 
 def main(imgFiles, pointCloudFiles):
@@ -19,10 +18,29 @@ def main(imgFiles, pointCloudFiles):
     lastCloud = o3d.geometry.PointCloud()
     points = np.zeros((0, 3))
     lastCloud.points = o3d.utility.Vector3dVector(points)
-    for filename in files:
-        print(pointCloudFiles + "\\" + filename)
-        lastCloud = createVehicleInfo((pointCloudFiles + "\\" + filename), imageInfo, median_cloud,lastCloud)
-        print(cars)
+    filename = 'ground_truth.csv'
+    with open(filename, 'w') as file:
+        file.write("Frame,Vehicle_ID,Pos_X,Pos_Y,Pos_Z,MVec_X,MVec_Y,MVec_Z,BBox_X_Min,BBox_X_Max,BBox_Y_Min,BBox_Y_Max,BBox_Z_Min,BBox_Z_Max\n")
+        for filename in files:
+            print(pointCloudFiles + "\\" + filename)
+            lastCloud = createVehicleInfo((pointCloudFiles + "\\" + filename), imageInfo, median_cloud,lastCloud)
+            # print(cars)
+            for car_id, car_info in cars.items():
+                Frame = filename[:-4]
+                Vehicle_ID = car_id
+                Pos_X = car_info['center'][0]
+                Pos_Y = car_info['center'][1]
+                Pos_Z = car_info['center'][2]
+                MVec_X = -1
+                MVec_Y = -1
+                MVec_Z = -1
+                BBox_X_Min = car_info['coord_min'][0]
+                BBox_X_Max = car_info['coord_max'][0]
+                BBox_Y_Min = car_info['coord_min'][1]
+                BBox_Y_Max = car_info['coord_max'][1]
+                BBox_Z_Min = car_info['coord_min'][2]
+                BBox_Z_Max = car_info['coord_max'][2]
+                file.write(f"{Frame},{Vehicle_ID},{Pos_X},{Pos_Y},{Pos_Z},{MVec_X},{MVec_Y},{MVec_Z},{BBox_X_Min},{BBox_X_Max},{BBox_Y_Min},{BBox_Y_Max},{BBox_Z_Min},{BBox_Z_Max}\n")
 
 def findMedianCloud(files,pointCloudFiles):
     pointClouds = []
@@ -148,12 +166,20 @@ def ClusterLidar(file, median_cloud, last_cloud):
                                                 (existing_center[2] - new_car_center[2])**2) ** 0.5
                                     cars[car_id]['velocity'] = round(velocity, 8)
                                     cars[car_id]['center'] = tuple(round(coord, 8) for coord in new_car_center)
+                                    cars[car_id]['coord_min'] = min_xyz
+                                    cars[car_id]['coord_max'] = max_xyz
                                     break
                             else:
                                 car_id = len(cars) + 1
-                                cars[car_id] = {'center': tuple(round(coord, 8) for coord in new_car_center), 'velocity': 0.0}
+                                cars[car_id] = {'center': tuple(round(coord, 8) for coord in new_car_center),
+                                                'velocity': 0.0,
+                                                'coord_min': min_xyz,
+                                                'coord_max': max_xyz}
                         else:
-                            cars[1] = {'center': tuple(round(coord, 8) for coord in new_car_center), 'velocity': 0.0}
+                            cars[1] = {'center': tuple(round(coord, 8) for coord in new_car_center),
+                                       'velocity': 0.0,
+                                       'coord_min': min_xyz,
+                                       'coord_max': max_xyz}
 
                         for i, j in zip([0, 1, 2, 3], [1, 2, 3, 0]):
                             ax.plot3D([edges[i, 0], edges[j, 0]], [edges[i, 1], edges[j, 1]], [edges[i, 2], edges[j, 2]],
