@@ -4,36 +4,29 @@ import open3d as o3d
 from matplotlib import pyplot as plt
 from natsort import natsorted
 from sklearn.cluster import DBSCAN
-import natsort
-import ImageInfo as im
 
 
 cars = {}
 
-def main(imgFiles, pointCloudFiles):
-    imageInfo = []
+def main(pointCloudFiles):
     files = os.listdir(pointCloudFiles)
     files = natsorted(files)
     median_cloud = findMedianCloud(files, pointCloudFiles)
-    lastCloud = o3d.geometry.PointCloud()
-    points = np.zeros((0, 3))
-    lastCloud.points = o3d.utility.Vector3dVector(points)
     filename = 'ground_truth.csv'
     with open(filename, 'w') as file:
         file.write("Frame,Vehicle_ID,Pos_X,Pos_Y,Pos_Z,MVec_X,MVec_Y,MVec_Z,BBox_X_Min,BBox_X_Max,BBox_Y_Min,BBox_Y_Max,BBox_Z_Min,BBox_Z_Max\n")
         for filename in files:
             print(pointCloudFiles + "\\" + filename)
-            lastCloud = createVehicleInfo((pointCloudFiles + "\\" + filename), imageInfo, median_cloud,lastCloud)
-            # print(cars)
+            ClusterLidar((pointCloudFiles + "\\" + filename), median_cloud)
             for car_id, car_info in cars.items():
                 Frame = filename[:-4]
                 Vehicle_ID = car_id
                 Pos_X = car_info['center'][0]
                 Pos_Y = car_info['center'][1]
                 Pos_Z = car_info['center'][2]
-                MVec_X = -1
-                MVec_Y = -1
-                MVec_Z = -1
+                MVec_X = car_info['MvecX']
+                MVec_Y = car_info['MvecY']
+                MVec_Z = car_info['MvecZ']
                 BBox_X_Min = car_info['coord_min'][0]
                 BBox_X_Max = car_info['coord_max'][0]
                 BBox_Y_Min = car_info['coord_min'][1]
@@ -42,6 +35,9 @@ def main(imgFiles, pointCloudFiles):
                 BBox_Z_Max = car_info['coord_max'][2]
                 file.write(f"{Frame},{Vehicle_ID},{Pos_X},{Pos_Y},{Pos_Z},{MVec_X},{MVec_Y},{MVec_Z},{BBox_X_Min},{BBox_X_Max},{BBox_Y_Min},{BBox_Y_Max},{BBox_Z_Min},{BBox_Z_Max}\n")
 
+#@Param files the list of files.
+#@Param point cloud files string to path correctly.
+#@return a median cloud of the first 70 frames outlier removal.
 def findMedianCloud(files,pointCloudFiles):
     pointClouds = []
     x = 0
@@ -52,7 +48,6 @@ def findMedianCloud(files,pointCloudFiles):
         if (x >= 70):
             break
         x += 1
-    all_points = np.vstack(pointClouds)
     max_points = max(len(pc) for pc in pointClouds)
     median_cloud = np.zeros((max_points, 3))  # Assuming 3 dimensions (x, y, z)
 
@@ -68,29 +63,14 @@ def findMedianCloud(files,pointCloudFiles):
     plt.show()
     return median_cloud
 
-
-
-def FillVehics(img, imageInfo, median_cloud,lastCloud):
-    clusters,lastCloud = ClusterLidar(img,median_cloud,lastCloud)
-    return lastCloud
-
-
 def display_inlier_outlier(cloud, ind):
     inlier_cloud = cloud.select_by_index(ind)
-    outlier_cloud = cloud.select_by_index(ind, invert=True)
-    # print("{} outliers. That is {}%".format(len(outlier_cloud.points), (len(outlier_cloud.points)/(len(outlier_cloud.points)+len(inlier_cloud.points)))))
-    
-    # print("Showing outliers (red) and inlddddiers (gray): ")
-    # outlier_cloud.paint_uniform_color([1, 0, 0])
-    # inlier_cloud.paint_uniform_color([0.8, 0.8, 0.8])
-    # o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud])
-
     return inlier_cloud
 
-# create clusters to count and track the cars
-# measure velocity from the movement of one frame to the next
-# compare based on the closest cluster to the position of the cluster in the previous frame
-def ClusterLidar(file, median_cloud, last_cloud):
+#@Param file the current file being examined
+#@Param median_cloud median cloud of the first 70 frames outlier removal.
+#@Return list of clusters for velocity and positioning determination.
+def ClusterLidar(file, median_cloud):
     pcd = o3d.io.read_point_cloud(file)
     voxel_down_pcd = pcd.voxel_down_sample(voxel_size = 0.04)
 
@@ -100,18 +80,10 @@ def ClusterLidar(file, median_cloud, last_cloud):
 
     point_cloud = np.asarray(inlier_cloud.points)
     points = remove_matching_points(point_cloud, median_cloud)
-    #if len(last_cloud.points)>0:
-    #   points = remove_matching_points(points,np.asarray(last_cloud.points))
-    #print(len(points))
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(points)
     clusters = np.array(0)
     if(len(points>0)):
-        #clustering = DBSCAN(eps=.5, min_samples=20).fit(points)
-        #cluster_labels = clustering.labels_
-        #visualize_clusters(points, cluster_labels)
-        #unique_labels = set(cluster_labels)
-        #colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
         dbscan = DBSCAN(eps=0.8, min_samples=10)  # Adjust parameters as needed 1,30
         labels = dbscan.fit_predict(point_cloud.points)
 
@@ -151,7 +123,7 @@ def ClusterLidar(file, median_cloud, last_cloud):
 
                         new_car_center = (max_xyz[0] - min_xyz[0], max_xyz[1] - min_xyz[1], max_xyz[2] - min_xyz[2])
                         if cars:
-                            similarity_threshold = 0.0001  ## Change this threshold accordingly
+                            similarity_threshold = 0.05  ## Change this threshold accordingly
 
                             for car_id, car_info in cars.items():
                                 existing_center = car_info['center']
@@ -161,10 +133,9 @@ def ClusterLidar(file, median_cloud, last_cloud):
                                     or abs(existing_center[1] - new_car_center[1]) < similarity_threshold
                                     or abs(existing_center[2] - new_car_center[2]) < similarity_threshold
                                 ):
-                                    velocity = ((existing_center[0] - new_car_center[0])**2 +
-                                                (existing_center[1] - new_car_center[1])**2 +
-                                                (existing_center[2] - new_car_center[2])**2) ** 0.5
-                                    cars[car_id]['velocity'] = round(velocity, 8)
+                                    cars[car_id]['MvecX'] = round(existing_center[0] - new_car_center[0]/(1/30),8)
+                                    cars[car_id]['MvecY'] = round((existing_center[1] - new_car_center[1])/(1/30),8)
+                                    cars[car_id]['MvecZ'] = round((existing_center[2] - new_car_center[2])/(1/30),8)
                                     cars[car_id]['center'] = tuple(round(coord, 8) for coord in new_car_center)
                                     cars[car_id]['coord_min'] = min_xyz
                                     cars[car_id]['coord_max'] = max_xyz
@@ -172,12 +143,16 @@ def ClusterLidar(file, median_cloud, last_cloud):
                             else:
                                 car_id = len(cars) + 1
                                 cars[car_id] = {'center': tuple(round(coord, 8) for coord in new_car_center),
-                                                'velocity': 0.0,
+                                                'MvecX': 0.0,
+                                                'MvecY': 0.0,
+                                                'MvecZ': 0.0,
                                                 'coord_min': min_xyz,
                                                 'coord_max': max_xyz}
                         else:
                             cars[1] = {'center': tuple(round(coord, 8) for coord in new_car_center),
-                                       'velocity': 0.0,
+                                       'MvecX': 0.0,
+                                       'MvecY': 0.0,
+                                       'MvecZ': 0.0,
                                        'coord_min': min_xyz,
                                        'coord_max': max_xyz}
 
@@ -201,16 +176,11 @@ def ClusterLidar(file, median_cloud, last_cloud):
             ax.set_zlabel('Z')
             ax.legend()
     plt.show()
-    return clusters, pcd
+    return clusters
 
-
-def createVehicleInfo(file, imageInfo, median_cloud,lastCloud):
-    lastCloud = FillVehics(file, imageInfo, median_cloud,lastCloud)
-    return lastCloud
-
-    # call functions to set each element of the vehic class
-
-
+#@Param pointcloud point cloud you want to remove points from
+#@Param mediancloud point cloud you want to remove from the other.
+#@Return The difference of the point clouds
 def remove_matching_points(pointcloud, mediancloud):
     tolerance = 1e-6
     rounded_pc1 = np.around(pointcloud, decimals=int(-np.log10(tolerance)))
@@ -232,7 +202,9 @@ def remove_matching_points(pointcloud, mediancloud):
 
     return filtered_pc1
 
-
+#@Param points nparray of points
+#@Param cluster_lables labels for the clusters
+#@Return vehicles the clusters that represent vehicles.
 def visualize_clusters(points, cluster_labels, vehicles):
     # Visualize clusters
     fig = plt.figure(figsize=(10, 10))
@@ -257,7 +229,6 @@ def visualize_clusters(points, cluster_labels, vehicles):
 
 if __name__ == "__main__":
     # LOAD Folders
-    imgFiles = "dataset\Images"
-    print(imgFiles)
-    pointCloudFiles = "dataset\PointClouds"
-    main(imgFiles, pointCloudFiles)
+    imgFiles = "F:\\Computer Vision\\traffic-light\\ryan\\dataset\\Images"
+    pointCloudFiles = "F:\\Computer Vision\\traffic-light\\ryan\\dataset\\PointClouds"
+    main(pointCloudFiles)
