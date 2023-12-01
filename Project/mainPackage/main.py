@@ -90,8 +90,15 @@ def ClusterLidar(file, median_cloud):
         # Get unique cluster labels
         unique_labels = np.unique(labels)
         num_clusters = len(unique_labels[unique_labels != -1])  # Exclude noise points (-1 label)
-        print(num_clusters)
 
+
+        # Retrieve cluster positions (centroids)
+        cluster_positions = []
+        for label in unique_labels:
+            cluster_points = np.asarray(point_cloud.points)[labels==label]
+            centroid = np.mean(cluster_points, axis=0)
+            cluster_positions.append(centroid)
+        print(cluster_positions)
         if (num_clusters > 0):
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
@@ -123,17 +130,17 @@ def ClusterLidar(file, median_cloud):
 
                         new_car_center = (max_xyz[0] - min_xyz[0], max_xyz[1] - min_xyz[1], max_xyz[2] - min_xyz[2])
                         if cars:
-                            similarity_threshold = 0.05  ## Change this threshold accordingly
+                            similarity_threshold = 1e-2 ## Change this threshold accordingly
 
                             for car_id, car_info in cars.items():
                                 existing_center = car_info['center']
 
                                 if (
                                     abs(existing_center[0] - new_car_center[0]) < similarity_threshold
-                                    or abs(existing_center[1] - new_car_center[1]) < similarity_threshold
-                                    or abs(existing_center[2] - new_car_center[2]) < similarity_threshold
+                                    and abs(existing_center[1] - new_car_center[1]) < similarity_threshold
+                                    and abs(existing_center[2] - new_car_center[2]) < similarity_threshold
                                 ):
-                                    cars[car_id]['MvecX'] = round(existing_center[0] - new_car_center[0]/(1/30),8)
+                                    cars[car_id]['MvecX'] = round((existing_center[0] - new_car_center[0])/(1/30),8)
                                     cars[car_id]['MvecY'] = round((existing_center[1] - new_car_center[1])/(1/30),8)
                                     cars[car_id]['MvecZ'] = round((existing_center[2] - new_car_center[2])/(1/30),8)
                                     cars[car_id]['center'] = tuple(round(coord, 8) for coord in new_car_center)
