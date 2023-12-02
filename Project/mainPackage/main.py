@@ -5,16 +5,18 @@ from matplotlib import pyplot as plt
 from natsort import natsorted
 from sklearn.cluster import DBSCAN
 
-
+pointCloudFiles = "F:\\Computer Vision\\traffic-light\\ryan\\dataset\\PointClouds"
 cars = {}
 
 def main(pointCloudFiles):
     files = os.listdir(pointCloudFiles)
     files = natsorted(files)
-    median_cloud = findMedianCloud(files, pointCloudFiles)
+    median_cloud = findMedianCloud(files, pointCloudFiles,0,10)
     filenameResult = ".\\perception_results\\frame_"
     x=0
     for filename in files:
+        #if(x%10==0):
+        #    median_cloud = findMedianCloud(files,pointCloudFiles,x,10)
         print(pointCloudFiles + "\\" + filename)
         ClusterLidar((pointCloudFiles + "\\" + filename), median_cloud)
         for car_id, car_info in cars.items():
@@ -32,24 +34,25 @@ def main(pointCloudFiles):
             BBox_Y_Max = car_info['coord_max'][1]
             BBox_Z_Min = car_info['coord_min'][2]
             BBox_Z_Max = car_info['coord_max'][2]
-            file = open(filenameResult+str(x), "w+")
+            file = open(filenameResult+str(x)+".csv", "w+")
             file.write("Frame,Vehicle_ID,Pos_X,Pos_Y,Pos_Z,MVec_X,MVec_Y,MVec_Z,BBox_X_Min,BBox_X_Max,BBox_Y_Min,BBox_Y_Max,BBox_Z_Min,BBox_Z_Max\n")
             file.write(f"{Frame},{Vehicle_ID},{Pos_X},{Pos_Y},{Pos_Z},{MVec_X},{MVec_Y},{MVec_Z},{BBox_X_Min},{BBox_X_Max},{BBox_Y_Min},{BBox_Y_Max},{BBox_Z_Min},{BBox_Z_Max}\n")
-        x+=1
+        x += 1
 
 #@Param files the list of files.
 #@Param point cloud files string to path correctly.
 #@return a median cloud of the first 70 frames outlier removal.
-def findMedianCloud(files,pointCloudFiles):
+def findMedianCloud(files,pointCloudFiles,start,number):
     pointClouds = []
-    x = 0
-    for filename in files:
-        pointCloud = o3d.io.read_point_cloud(pointCloudFiles + "\\" + filename)
-        points = np.asarray(pointCloud.points)
+    if(start != 0):
+        start = start-10
+    for x in range(number):
+        pointCloud = o3d.io.read_point_cloud(pointCloudFiles + "\\" + str(start+x)+".pcd")
+        voxel_down_pcd = pointCloud.voxel_down_sample(voxel_size=0.35)
+        points = np.asarray(voxel_down_pcd.points)
         pointClouds.append(points)
-        if (x >= 70):
+        if (x >= number):
             break
-        x += 1
     max_points = max(len(pc) for pc in pointClouds)
     median_cloud = np.zeros((max_points, 3))  # Assuming 3 dimensions (x, y, z)
 
@@ -59,10 +62,6 @@ def findMedianCloud(files,pointCloudFiles):
         median_cloud[i] = median_point
 
     median_cloud = median_cloud[~np.all(median_cloud == 0, axis=1)]
-    fig = plt.figure(figsize=(24, 24))  
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(median_cloud[:,0], median_cloud[:,1], median_cloud[:,2], marker='o', s=20)
-    plt.show()
     return median_cloud
 
 def display_inlier_outlier(cloud, ind):
@@ -74,18 +73,18 @@ def display_inlier_outlier(cloud, ind):
 #@Return list of clusters for velocity and positioning determination.
 def ClusterLidar(file, median_cloud):
     pcd = o3d.io.read_point_cloud(file)
-    voxel_down_pcd = pcd.voxel_down_sample(voxel_size = 0.04)
+    voxel_down_pcd = pcd.voxel_down_sample(voxel_size = 0.35)
 
-    cl, ind = voxel_down_pcd.remove_statistical_outlier(nb_neighbors = 25, std_ratio = 1)
-    inlier_cloud = display_inlier_outlier(voxel_down_pcd, ind)
+    #cl, ind = voxel_down_pcd.remove_statistical_outlier(nb_neighbors = 25, std_ratio = 1)
+    #inlier_cloud = display_inlier_outlier(voxel_down_pcd, ind)
 
-    point_cloud = np.asarray(inlier_cloud.points)
+    point_cloud = np.asarray(voxel_down_pcd.points)
     points = remove_matching_points(point_cloud, median_cloud)
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(points)
     clusters = np.array(0)
     if(len(points>0)):
-        dbscan = DBSCAN(eps=0.8, min_samples=10)  # Adjust parameters as needed 1,30
+        dbscan = DBSCAN(eps=.8, min_samples=10)  # Adjust parameters as needed 1,30
         labels = dbscan.fit_predict(point_cloud.points)
 
         # Get unique cluster labels
@@ -134,9 +133,9 @@ def ClusterLidar(file, median_cloud):
                                     and abs(existing_center[1] - new_car_center[1]) < similarity_threshold
                                     and abs(existing_center[2] - new_car_center[2]) < similarity_threshold
                                 ):
-                                    cars[car_id]['MvecX'] = round((existing_center[0] - new_car_center[0])*30,8)
-                                    cars[car_id]['MvecY'] = round((existing_center[1] - new_car_center[1])*30,8)
-                                    cars[car_id]['MvecZ'] = round((existing_center[2] - new_car_center[2])*30,8)
+                                    cars[car_id]['MvecX'] = round((existing_center[0] - new_car_center[0])*10,8)
+                                    cars[car_id]['MvecY'] = round((existing_center[1] - new_car_center[1])*10,8)
+                                    cars[car_id]['MvecZ'] = round((existing_center[2] - new_car_center[2])*10,8)
                                     cars[car_id]['center'] = tuple(round(coord, 8) for coord in new_car_center)
                                     cars[car_id]['coord_min'] = min_xyz
                                     cars[car_id]['coord_max'] = max_xyz
