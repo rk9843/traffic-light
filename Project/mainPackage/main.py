@@ -11,14 +11,17 @@ cars = {}
 def main(pointCloudFiles):
     files = os.listdir(pointCloudFiles)
     files = natsorted(files)
-    median_cloud = findMedianCloud(files, pointCloudFiles,0,10)
+    median_cloud = findMedianCloud(files, pointCloudFiles,0,5)
     filenameResult = ".\\perception_results\\frame_"
     x=0
     for filename in files:
         #if(x%10==0):
-        #    median_cloud = findMedianCloud(files,pointCloudFiles,x,10)
+        #    median_cloud = findMedianCloud(files,pointCloudFiles,x,5)
         print(pointCloudFiles + "\\" + filename)
         ClusterLidar((pointCloudFiles + "\\" + filename), median_cloud)
+        file = open(filenameResult + str(x) + ".csv", "w+")
+        file.write(
+            "Frame,Vehicle_ID,Pos_X,Pos_Y,Pos_Z,MVec_X,MVec_Y,MVec_Z,BBox_X_Min,BBox_X_Max,BBox_Y_Min,BBox_Y_Max,BBox_Z_Min,BBox_Z_Max\n")
         for car_id, car_info in cars.items():
             Frame = filename[:-4]
             Vehicle_ID = car_id
@@ -34,21 +37,20 @@ def main(pointCloudFiles):
             BBox_Y_Max = car_info['coord_max'][1]
             BBox_Z_Min = car_info['coord_min'][2]
             BBox_Z_Max = car_info['coord_max'][2]
-            file = open(filenameResult+str(x)+".csv", "w+")
-            file.write("Frame,Vehicle_ID,Pos_X,Pos_Y,Pos_Z,MVec_X,MVec_Y,MVec_Z,BBox_X_Min,BBox_X_Max,BBox_Y_Min,BBox_Y_Max,BBox_Z_Min,BBox_Z_Max\n")
+
             file.write(f"{Frame},{Vehicle_ID},{Pos_X},{Pos_Y},{Pos_Z},{MVec_X},{MVec_Y},{MVec_Z},{BBox_X_Min},{BBox_X_Max},{BBox_Y_Min},{BBox_Y_Max},{BBox_Z_Min},{BBox_Z_Max}\n")
         x += 1
-
+        file.close()
 #@Param files the list of files.
 #@Param point cloud files string to path correctly.
 #@return a median cloud of the first 70 frames outlier removal.
 def findMedianCloud(files,pointCloudFiles,start,number):
     pointClouds = []
     if(start != 0):
-        start = start-10
+        start = start-2*number
     for x in range(number):
         pointCloud = o3d.io.read_point_cloud(pointCloudFiles + "\\" + str(start+x)+".pcd")
-        voxel_down_pcd = pointCloud.voxel_down_sample(voxel_size=0.35)
+        voxel_down_pcd = pointCloud.voxel_down_sample(voxel_size=0.2)
         points = np.asarray(voxel_down_pcd.points)
         pointClouds.append(points)
         if (x >= number):
@@ -73,7 +75,7 @@ def display_inlier_outlier(cloud, ind):
 #@Return list of clusters for velocity and positioning determination.
 def ClusterLidar(file, median_cloud):
     pcd = o3d.io.read_point_cloud(file)
-    voxel_down_pcd = pcd.voxel_down_sample(voxel_size = 0.35)
+    voxel_down_pcd = pcd.voxel_down_sample(voxel_size = 0.2)
 
     #cl, ind = voxel_down_pcd.remove_statistical_outlier(nb_neighbors = 25, std_ratio = 1)
     #inlier_cloud = display_inlier_outlier(voxel_down_pcd, ind)
@@ -123,15 +125,15 @@ def ClusterLidar(file, median_cloud):
 
                         new_car_center = centroid
                         if cars:
-                            similarity_threshold = 1 ## Change this threshold accordingly
+                            similarity_threshold = .1 ## Change this threshold accordingly
 
                             for car_id, car_info in cars.items():
                                 existing_center = car_info['center']
 
                                 if (
-                                    abs(existing_center[0] - new_car_center[0]) < similarity_threshold
-                                    and abs(existing_center[1] - new_car_center[1]) < similarity_threshold
-                                    and abs(existing_center[2] - new_car_center[2]) < similarity_threshold
+                                    abs(existing_center[0] - (new_car_center[0])) < similarity_threshold
+                                    and abs(existing_center[1] - (new_car_center[1])) < similarity_threshold
+                                    and abs(existing_center[2] - (new_car_center[2])) < similarity_threshold
                                 ):
                                     cars[car_id]['MvecX'] = round((existing_center[0] - new_car_center[0])*10,8)
                                     cars[car_id]['MvecY'] = round((existing_center[1] - new_car_center[1])*10,8)
