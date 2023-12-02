@@ -12,28 +12,30 @@ def main(pointCloudFiles):
     files = os.listdir(pointCloudFiles)
     files = natsorted(files)
     median_cloud = findMedianCloud(files, pointCloudFiles)
-    filename = 'ground_truth.csv'
-    with open(filename, 'w') as file:
-        file.write("Frame,Vehicle_ID,Pos_X,Pos_Y,Pos_Z,MVec_X,MVec_Y,MVec_Z,BBox_X_Min,BBox_X_Max,BBox_Y_Min,BBox_Y_Max,BBox_Z_Min,BBox_Z_Max\n")
-        for filename in files:
-            print(pointCloudFiles + "\\" + filename)
-            ClusterLidar((pointCloudFiles + "\\" + filename), median_cloud)
-            for car_id, car_info in cars.items():
-                Frame = filename[:-4]
-                Vehicle_ID = car_id
-                Pos_X = car_info['center'][0]
-                Pos_Y = car_info['center'][1]
-                Pos_Z = car_info['center'][2]
-                MVec_X = car_info['MvecX']
-                MVec_Y = car_info['MvecY']
-                MVec_Z = car_info['MvecZ']
-                BBox_X_Min = car_info['coord_min'][0]
-                BBox_X_Max = car_info['coord_max'][0]
-                BBox_Y_Min = car_info['coord_min'][1]
-                BBox_Y_Max = car_info['coord_max'][1]
-                BBox_Z_Min = car_info['coord_min'][2]
-                BBox_Z_Max = car_info['coord_max'][2]
-                file.write(f"{Frame},{Vehicle_ID},{Pos_X},{Pos_Y},{Pos_Z},{MVec_X},{MVec_Y},{MVec_Z},{BBox_X_Min},{BBox_X_Max},{BBox_Y_Min},{BBox_Y_Max},{BBox_Z_Min},{BBox_Z_Max}\n")
+    filenameResult = ".\\perception_results\\frame_"
+    x=0
+    for filename in files:
+        print(pointCloudFiles + "\\" + filename)
+        ClusterLidar((pointCloudFiles + "\\" + filename), median_cloud)
+        for car_id, car_info in cars.items():
+            Frame = filename[:-4]
+            Vehicle_ID = car_id
+            Pos_X = car_info['center'][0]
+            Pos_Y = car_info['center'][1]
+            Pos_Z = car_info['center'][2]
+            MVec_X = car_info['MvecX']
+            MVec_Y = car_info['MvecY']
+            MVec_Z = car_info['MvecZ']
+            BBox_X_Min = car_info['coord_min'][0]
+            BBox_X_Max = car_info['coord_max'][0]
+            BBox_Y_Min = car_info['coord_min'][1]
+            BBox_Y_Max = car_info['coord_max'][1]
+            BBox_Z_Min = car_info['coord_min'][2]
+            BBox_Z_Max = car_info['coord_max'][2]
+            file = open(filenameResult+str(x), "w+")
+            file.write("Frame,Vehicle_ID,Pos_X,Pos_Y,Pos_Z,MVec_X,MVec_Y,MVec_Z,BBox_X_Min,BBox_X_Max,BBox_Y_Min,BBox_Y_Max,BBox_Z_Min,BBox_Z_Max\n")
+            file.write(f"{Frame},{Vehicle_ID},{Pos_X},{Pos_Y},{Pos_Z},{MVec_X},{MVec_Y},{MVec_Z},{BBox_X_Min},{BBox_X_Max},{BBox_Y_Min},{BBox_Y_Max},{BBox_Z_Min},{BBox_Z_Max}\n")
+        x+=1
 
 #@Param files the list of files.
 #@Param point cloud files string to path correctly.
